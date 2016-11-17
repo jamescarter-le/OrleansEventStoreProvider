@@ -3,7 +3,25 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 14
 VisualStudioVersion = 14.0.25420.1
 MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansEventStoreProvider", "src\OrleansEventStoreProvider\OrleansEventStoreProvider.csproj", "{3D9A4E87-F01E-4626-B188-B10AA18957D4}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansEventStoreProviderTests", "test\OrleansEventStoreProviderTests\OrleansEventStoreProviderTests.csproj", "{9CA3D501-DDB5-4B53-8D76-FBF118ADD7AF}"
+EndProject
 Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{3D9A4E87-F01E-4626-B188-B10AA18957D4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3D9A4E87-F01E-4626-B188-B10AA18957D4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3D9A4E87-F01E-4626-B188-B10AA18957D4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3D9A4E87-F01E-4626-B188-B10AA18957D4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9CA3D501-DDB5-4B53-8D76-FBF118ADD7AF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9CA3D501-DDB5-4B53-8D76-FBF118ADD7AF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9CA3D501-DDB5-4B53-8D76-FBF118ADD7AF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9CA3D501-DDB5-4B53-8D76-FBF118ADD7AF}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
