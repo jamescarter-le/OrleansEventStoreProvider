@@ -25,7 +25,7 @@ namespace OrleansEventStoreProvider
 
         public string Name => m_ProviderName;
         public bool IsRewindable => true;
-        public StreamProviderDirection Direction => StreamProviderDirection.ReadOnly;
+        public StreamProviderDirection Direction => StreamProviderDirection.ReadWrite;
 
         public void Init(IProviderConfiguration config, string providerName, Logger logger, IServiceProvider serviceProvider)
         {
@@ -62,15 +62,15 @@ namespace OrleansEventStoreProvider
             return m_QueueMapper;
         }
 
-        public Task<IStreamFailureHandler> GetDeliveryFailureHandler(QueueId queueId)
+        public async Task<IStreamFailureHandler> GetDeliveryFailureHandler(QueueId queueId)
         {
-            return null;
+            return this;
         }
 
         public Task QueueMessageBatchAsync<T>(Guid streamGuid, string streamNamespace, IEnumerable<T> events, StreamSequenceToken token,
             Dictionary<string, object> requestContext)
         {
-            return null;
+            return TaskDone.Done;
         }
 
         public IQueueAdapterReceiver CreateReceiver(QueueId queueId)

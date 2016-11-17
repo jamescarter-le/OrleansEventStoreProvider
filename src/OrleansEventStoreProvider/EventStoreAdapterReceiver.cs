@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -15,8 +16,9 @@ namespace OrleansEventStoreProvider
         private readonly Logger m_Logger;
         private readonly QueueId m_QueueId;
         private readonly EventStoreQueueMapper m_QueueMapper;
-        private readonly string m_StreamNamespace;
         private readonly IQueueCache m_QueueCache;
+        private ConcurrentBag<Task> m_SubscribeTasks = new ConcurrentBag<Task>();
+        private HashSet<string> m_SubscribedStreams = new HashSet<string>();
 
         public EventStoreAdapterReceiver(IEventStoreConnection eventStoreConnection, Logger logger, QueueId queueId, EventStoreQueueMapper queueMapper, IQueueAdapterCache queueAdapterCache)
         {
@@ -24,35 +26,48 @@ namespace OrleansEventStoreProvider
             m_Logger = logger;
             m_QueueId = queueId;
             m_QueueMapper = queueMapper;
-            m_StreamNamespace = m_QueueMapper.GetStreamsForQueue(queueId);
             m_QueueCache = queueAdapterCache.CreateQueueCache(queueId);
         }
 
         public async Task Initialize(TimeSpan timeout)
         {
-            CancellationTokenSource cancel = new CancellationTokenSource(timeout);
-            await Task.Run(async () =>
+            m_QueueMapper.AssociateReceiverWithQueue(m_QueueId, this);
+        }
+
+        public void SubscribeTo(string streamNamespace)
+        {
+            m_SubscribedStreams.Add(streamNamespace);
+            m_SubscribeTasks.Add(Task.Run(async () =>
             {
-                await m_EventStoreConnection.SubscribeToStreamAsync(m_StreamNamespace, true, EventAppeared, SubscriptionDropped);
-                m_Logger.Info($"Subscribed to Stream {m_StreamNamespace}");
-            }, cancel.Token);
+                await m_EventStoreConnection.SubscribeToStreamAsync(streamNamespace, true, EventAppeared, SubscriptionDropped);
+                m_Logger.Info($"Subscribed to Stream {streamNamespace}");
+            }));
         }
 
         private void SubscriptionDropped(EventStoreSubscription eventStoreSubscription, SubscriptionDropReason subscriptionDropReason, Exception arg3)
         {
-            m_Logger.Info($"Subscription dropped for Stream {m_QueueId.GetStringNamePrefix()}");
+            m_Logger.Info($"Subscription dropped for Stream {eventStoreSubscription.StreamId}: {subscriptionDropReason} \r\n {arg3}");
         }
 
         private void EventAppeared(EventStoreSubscription eventStoreSubscription, ResolvedEvent resolvedEvent)
         {
             var sequenceToken = new EventStoreStreamSequenceToken(resolvedEvent.Event.EventNumber);
             m_QueueCache.AddToCache(new [] {
-                new EventStoreBatchContainer(Guid.Empty, m_StreamNamespace, sequenceToken, resolvedEvent.Event.Data)
+                new EventStoreBatchContainer(Guid.Empty, eventStoreSubscription.StreamId, sequenceToken, resolvedEvent.Event.Data)
             });
         }
 
         public async Task<IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount)
         {
+            var queueStreams = m_QueueMapper.GetStreamNamesForQueue(m_QueueId);
+            foreach (var queueStream in queueStreams)
+            {
+                if (!m_SubscribedStreams.Contains(queueStream))
+                {
+                    SubscribeTo(queueStream);
+                }
+            }
+
             return new List<IBatchContainer>();
         }
 
