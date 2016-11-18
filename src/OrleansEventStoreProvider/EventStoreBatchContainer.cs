@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using EventStore.ClientAPI;
 using Orleans.Streams;
 
 namespace OrleansEventStoreProvider
@@ -9,14 +10,14 @@ namespace OrleansEventStoreProvider
         public Guid StreamGuid { get; }
         public string StreamNamespace { get; }
         public StreamSequenceToken SequenceToken { get; }
-        private readonly byte[] m_Message;
+        public ResolvedEvent ResolvedEvent { get; }
 
-        public EventStoreBatchContainer(Guid streamGuid, string streamNamespace, StreamSequenceToken sequenceToken, byte[] message)
+        public EventStoreBatchContainer(Guid streamGuid, string streamNamespace, StreamSequenceToken sequenceToken, ResolvedEvent resolvedEvent)
         {
+            ResolvedEvent = resolvedEvent;
             StreamGuid = streamGuid;
             StreamNamespace = streamNamespace;
             SequenceToken = sequenceToken;
-            m_Message = message;
         }
 
         public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>()

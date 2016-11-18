@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Storage;
@@ -10,10 +11,29 @@ using Xunit;
 
 namespace OrleansEventStoreProviderTests
 {
+    public interface IStreamSubscriberGrain : IGrainWithGuidKey
+    {
+        Task SubscribeTo(Guid streamGuid, string streamNamespace, string providerName);
+    }
+
+    public class StreamSubscriberGrain : Grain, IStreamSubscriberGrain
+    {
+        public async Task SubscribeTo(Guid streamGuid, string streamNamespace, string providerName)
+        {
+            var provider = this.GetStreamProvider(providerName);
+            var stream = provider.GetStream<int>(streamGuid, streamNamespace);
+            await stream.SubscribeAsync(async (i, s) =>
+            {
+                Debug.Write("Hello");
+            });
+        }
+    }
+
     public class EventStoreProviderTests : TestingSiloHost
     {
         private const string ProviderName = "EventStoreStreamProvider";
-        private const string ConnectionString = "ConnectTo=tcp://localhost:1113";
+        // Default settings of EventStore
+        private const string ConnectionString = "ConnectTo=tcp://admin:changeit@localhost:1113";
 
         private static readonly TestingSiloOptions m_SiloOptions;
         private static readonly TestingClientOptions m_ClientOptions;
@@ -61,15 +81,10 @@ namespace OrleansEventStoreProviderTests
         [Fact]
         public async Task CanSubscribe()
         {
-            var stream = GrainClient.GetStreamProvider(ProviderName).GetStream<int>(Guid.Empty, "$stats-127.0.0.1:2113");
-            TaskCompletionSource<int> completion = new TaskCompletionSource<int>();
-            await stream.OnNextAsync(100);
-            await stream.SubscribeAsync(async (val, sequence) =>
-            {
-                completion.SetResult(1);
-            });
+            var subscriber = GrainFactory.GetGrain<IStreamSubscriberGrain>(Guid.Empty);
+            await subscriber.SubscribeTo(Guid.Empty, "$stats-127.0.0.1:2113", ProviderName);
 
-            await completion.Task;
+            await Task.Delay(100000);
         }
     }
 }

@@ -1,12 +1,13 @@
-﻿using Orleans.Streams;
+﻿using Orleans.Providers.Streams.Common;
+using Orleans.Streams;
 
 namespace OrleansEventStoreProvider
 {
-    public class EventStoreStreamSequenceToken : StreamSequenceToken
+    public class EventStoreStreamSequenceToken : EventSequenceToken
     {
         public int EventNumber { get; }
 
-        public EventStoreStreamSequenceToken(int eventNumber)
+        public EventStoreStreamSequenceToken(int eventNumber) : base(eventNumber, eventNumber)
         {
             EventNumber = eventNumber;
         }

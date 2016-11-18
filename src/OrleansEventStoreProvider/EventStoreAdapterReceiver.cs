@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using EventStore.ClientAPI;
@@ -14,24 +15,22 @@ namespace OrleansEventStoreProvider
     {
         private readonly IEventStoreConnection m_EventStoreConnection;
         private readonly Logger m_Logger;
-        private readonly QueueId m_QueueId;
-        private readonly EventStoreQueueMapper m_QueueMapper;
-        private readonly IQueueCache m_QueueCache;
+
+        private readonly ConcurrentDictionary<string, object> m_CachedSubscriptions = new ConcurrentDictionary<string, object>();
+        private ConcurrentQueue<EventStoreBatchContainer> m_MessagesAwaitingDelivery = new ConcurrentQueue<EventStoreBatchContainer>();
+
         private ConcurrentBag<Task> m_SubscribeTasks = new ConcurrentBag<Task>();
         private HashSet<string> m_SubscribedStreams = new HashSet<string>();
 
-        public EventStoreAdapterReceiver(IEventStoreConnection eventStoreConnection, Logger logger, QueueId queueId, EventStoreQueueMapper queueMapper, IQueueAdapterCache queueAdapterCache)
+        public EventStoreAdapterReceiver(IEventStoreConnection eventStoreConnection, Logger logger)
         {
             m_EventStoreConnection = eventStoreConnection;
             m_Logger = logger;
-            m_QueueId = queueId;
-            m_QueueMapper = queueMapper;
-            m_QueueCache = queueAdapterCache.CreateQueueCache(queueId);
         }
 
         public async Task Initialize(TimeSpan timeout)
         {
-            m_QueueMapper.AssociateReceiverWithQueue(m_QueueId, this);
+            //m_QueueMapper.AssociateReceiverWithQueue(m_QueueId, this);
         }
 
         public void SubscribeTo(string streamNamespace)
@@ -39,7 +38,8 @@ namespace OrleansEventStoreProvider
             m_SubscribedStreams.Add(streamNamespace);
             m_SubscribeTasks.Add(Task.Run(async () =>
             {
-                await m_EventStoreConnection.SubscribeToStreamAsync(streamNamespace, true, EventAppeared, SubscriptionDropped);
+                var subscription = await m_EventStoreConnection.SubscribeToStreamAsync(streamNamespace, true, EventAppeared, SubscriptionDropped);
+                m_CachedSubscriptions.GetOrAdd(streamNamespace, subscription);
                 m_Logger.Info($"Subscribed to Stream {streamNamespace}");
             }));
         }
@@ -52,28 +52,40 @@ namespace OrleansEventStoreProvider
         private void EventAppeared(EventStoreSubscription eventStoreSubscription, ResolvedEvent resolvedEvent)
         {
             var sequenceToken = new EventStoreStreamSequenceToken(resolvedEvent.Event.EventNumber);
-            m_QueueCache.AddToCache(new [] {
-                new EventStoreBatchContainer(Guid.Empty, eventStoreSubscription.StreamId, sequenceToken, resolvedEvent.Event.Data)
-            });
+            m_MessagesAwaitingDelivery.Enqueue(new EventStoreBatchContainer(Guid.Empty, eventStoreSubscription.StreamId, sequenceToken, resolvedEvent));
         }
 
         public async Task<IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount)
         {
-            var queueStreams = m_QueueMapper.GetStreamNamesForQueue(m_QueueId);
-            foreach (var queueStream in queueStreams)
+            var containerList = new List<IBatchContainer>();
+            if (maxCount == 0)
+                return containerList;
+
+            EventStoreBatchContainer container;
+            while (containerList.Count < maxCount && m_MessagesAwaitingDelivery.TryDequeue(out container))
             {
-                if (!m_SubscribedStreams.Contains(queueStream))
-                {
-                    SubscribeTo(queueStream);
-                }
+                containerList.Add(container);
             }
 
-            return new List<IBatchContainer>();
+            return containerList;
         }
 
         public async Task MessagesDeliveredAsync(IList<IBatchContainer> messages)
         {
-            //return null;
+            await AcknowledgeEvents(messages);
+        }
+
+        private async Task AcknowledgeEvents(IList<IBatchContainer> messages)
+        {
+            var byNamespaces = messages.GroupBy(x => x.StreamNamespace);
+            foreach (var byNamespace in byNamespaces)
+            {
+                var persistentSubscription = m_CachedSubscriptions[byNamespace.Key] as EventStorePersistentSubscription;
+                if (persistentSubscription != null)
+                {
+                    persistentSubscription.Acknowledge(byNamespace.Cast<EventStoreBatchContainer>().Select(x => x.ResolvedEvent));
+                }
+            }
         }
 
         public Task Shutdown(TimeSpan timeout)

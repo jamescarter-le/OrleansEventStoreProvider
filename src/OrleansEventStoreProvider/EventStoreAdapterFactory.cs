@@ -37,7 +37,7 @@ namespace OrleansEventStoreProvider
             m_ProviderName = providerName;
             m_Logger = logger;
 
-            m_QueueMapper = new EventStoreQueueMapper(1, providerName);
+            m_QueueMapper = new EventStoreQueueMapper(2, providerName);
             m_QueueAdapterCache = new SimpleQueueAdapterCache(100, m_Logger);
 
             var connectionString = config.Properties["ConnectionString"];
@@ -80,7 +80,7 @@ namespace OrleansEventStoreProvider
 
         private EventStoreAdapterReceiver ConstructReceiver(QueueId queueId)
         {
-            return new EventStoreAdapterReceiver(m_EventStoreConnection, m_Logger, queueId, m_QueueMapper, m_QueueAdapterCache);
+            return new EventStoreAdapterReceiver(m_EventStoreConnection, m_Logger);
         }
 
         private void ConstructEventStoreConnection(string connectionString)
