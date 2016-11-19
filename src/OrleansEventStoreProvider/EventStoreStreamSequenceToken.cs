@@ -1,7 +1,7 @@
 ﻿using Orleans.Providers.Streams.Common;
 using Orleans.Streams;
 
-namespace OrleansEventStoreProvider
+namespace Orleans.Providers.Streams.EventStore
 {
     /// <summary>
     /// The sequence token for the EventStore Stream.

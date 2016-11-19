@@ -1,6 +1,6 @@
 ﻿using Orleans.Streams;
 
-namespace OrleansEventStoreProvider
+namespace Orleans.Providers.Streams.EventStore
 {
     public class EventStoreQueueMapper : HashRingBasedStreamQueueMapper
     {

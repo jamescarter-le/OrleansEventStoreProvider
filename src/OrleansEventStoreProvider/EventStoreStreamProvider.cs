@@ -3,7 +3,7 @@ using System.Reflection;
 using Orleans.Providers.Streams.Common;
 using Orleans.Streams;
 
-namespace OrleansEventStoreProvider
+namespace Orleans.Providers.Streams.EventStore
 {
     public class EventStoreStreamProvider : PersistentStreamProvider<EventStoreAdapterFactory>, IStreamProvider
     {

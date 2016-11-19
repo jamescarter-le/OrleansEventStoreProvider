@@ -2,13 +2,11 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Orleans;
-using Orleans.Providers;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Streams;
 
-namespace OrleansEventStoreProvider
+namespace Orleans.Providers.Streams.EventStore
 {
     public class EventStoreAdapterFactory : IQueueAdapterFactory, IQueueAdapter, IStreamFailureHandler
     {

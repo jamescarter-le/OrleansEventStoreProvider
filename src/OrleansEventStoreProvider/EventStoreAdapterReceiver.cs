@@ -4,11 +4,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using EventStore.ClientAPI;
-using Orleans;
 using Orleans.Runtime;
 using Orleans.Streams;
 
-namespace OrleansEventStoreProvider
+namespace Orleans.Providers.Streams.EventStore
 {
     public class EventStoreAdapterReceiver : IQueueAdapterReceiver
     {

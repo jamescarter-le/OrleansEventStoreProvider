@@ -2,15 +2,15 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using EventStore.ClientAPI.Embedded;
+using EventStore.Core;
 using Orleans.Storage;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
-using OrleansEventStoreProvider;
 using Xunit;
 
 namespace OrleansEventStoreProviderTests
 {
-    public class EventStoreProviderTests : TestingSiloHost
+    public class EventStoreProviderTests : TestingSiloHost, IDisposable
     {
         private const string ProviderName = "EventStoreStreamProvider";
         // Default Endpoints of EventStore
@@ -18,6 +18,7 @@ namespace OrleansEventStoreProviderTests
 
         private static readonly TestingSiloOptions m_SiloOptions;
         private static readonly TestingClientOptions m_ClientOptions;
+        private ClusterVNode m_EventStoreNode;
 
         static EventStoreProviderTests()
         {
@@ -59,8 +60,8 @@ namespace OrleansEventStoreProviderTests
         {
             var nodeBuilder = EmbeddedVNodeBuilder.AsSingleNode().OnDefaultEndpoints().RunInMemory();
             nodeBuilder.WithStatsPeriod(TimeSpan.FromSeconds(1));
-            var node = nodeBuilder.Build();
-            node.StartAndWaitUntilReady().Wait();
+            m_EventStoreNode = nodeBuilder.Build();
+            m_EventStoreNode.StartAndWaitUntilReady().Wait();
         }
 
         [Fact]
@@ -86,6 +87,11 @@ namespace OrleansEventStoreProviderTests
             var msg = await subscriber.ReceivedMessage();
             Assert.IsAssignableFrom<Dictionary<string, string>>(msg);
             Assert.True(msg.ContainsKey("proc-id"));
+        }
+
+        public void Dispose()
+        {
+            m_EventStoreNode.StopNonblocking(true, true);
         }
     }
 }

@@ -3,12 +3,11 @@ using System.Collections.Generic;
 using System.IO;
 using System.Runtime.Serialization;
 using EventStore.ClientAPI;
-using MsgPack;
 using MsgPack.Serialization;
 using Newtonsoft.Json;
 using Orleans.Streams;
 
-namespace OrleansEventStoreProvider
+namespace Orleans.Providers.Streams.EventStore
 {
     public class EventStoreBatchContainer : IBatchContainer
     {
