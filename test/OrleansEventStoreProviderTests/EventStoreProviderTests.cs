@@ -66,11 +66,6 @@ namespace OrleansEventStoreProviderTests
         }
 
         [Fact]
-        public async Task CanBoot()
-        {
-        }
-
-        [Fact]
         public async Task CanSubscribe()
         {
             var subscriber = GrainFactory.GetGrain<IStreamSubscriberGrain<object>>(Guid.Empty);

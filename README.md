@@ -1,3 +1,5 @@
+[![Build status](https://ci.appveyor.com/api/projects/status/yre5br5sj57trjxj/branch/master?svg=true)](https://ci.appveyor.com/project/jamescarter-le/orleanseventstoreprovider/branch/master)
+
 # OrleansEventStoreProvider
 An Orleans StreamProvider over EventStore
 
