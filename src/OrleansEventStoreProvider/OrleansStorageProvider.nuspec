@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
+  <metadata>
+    <id>OrleansEventStoreProvider</id>
+	<title>Orleans EventStore Stream Provider</title>
+    <version>$version$</version>
+    <description>Orleans Stream Provider for EventStore</description>
+    <authors>AltXE Limited</authors>
+  </metadata>
+  <files>
+  	<file src="bin\$configuration$\$id$.pdb" target="lib\net40\" />
+  </files>
+</package>

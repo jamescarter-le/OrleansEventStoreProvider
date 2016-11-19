@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using EventStore.ClientAPI.Embedded;
 using EventStore.Core;
+using Orleans.Providers.Streams.EventStore;
 using Orleans.Storage;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
