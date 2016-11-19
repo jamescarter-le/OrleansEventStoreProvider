@@ -87,7 +87,7 @@ namespace OrleansEventStoreProviderTests
 
         public void Dispose()
         {
-            m_EventStoreNode.StopNonblocking(true, true);
+            m_EventStoreNode.StopNonblocking(false, true);
         }
     }
 }
