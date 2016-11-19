@@ -7,7 +7,4 @@
     <description>Orleans Stream Provider for EventStore</description>
     <authors>AltXE Limited</authors>
   </metadata>
-  <files>
-  	<file src="bin\$configuration$\$id$.pdb" target="lib\net40\" />
-  </files>
 </package>
