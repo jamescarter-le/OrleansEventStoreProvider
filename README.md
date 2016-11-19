@@ -29,5 +29,5 @@ The settings available for ConnectionString are documented here: http://docs.get
 ```
 <Provider Type="Orleans.Providers.Streams.EventStore.EventStoreProvider"
           Name="CustomProvider"
-          ConnectionString="ConnectTo=tcp://admin:changeit:localhost:1113" />
+          ConnectionString="ConnectTo=tcp://admin:changeit@localhost:1113" />
 ```
