@@ -9,6 +9,13 @@ namespace OrleansEventStoreProvider
     {
         private EventStoreAdapterFactory m_CachedAdapterFactory;
 
+        /// <summary>
+        /// Capture the AdapterFactory for this Provider
+        /// </summary>
+        /// <remarks>
+        /// This accesses the private field "adapterFactory" - which I realise is nasty but there is no other way to resolve the AdapterFactory.
+        /// If the IStreamProvider was passed to child IQueueAdapterFactory we could associate it this way.
+        /// </remarks>
         protected EventStoreAdapterFactory AdapterFactory
         {
             get
@@ -22,7 +29,9 @@ namespace OrleansEventStoreProvider
             }
         }
 
-
+        /// <summary>
+        /// We intercept the call to resolve a Stream and use this opportunity to notify the appropriate Queue to Subscribe to the EventStore stream.
+        /// </summary>
         IAsyncStream<T> IStreamProvider.GetStream<T>(Guid id, string streamNamespace)
         {
             var queueId = AdapterFactory.GetStreamQueueMapper().GetQueueForStream(id, streamNamespace);

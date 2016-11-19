@@ -3,8 +3,16 @@ using Orleans.Streams;
 
 namespace OrleansEventStoreProvider
 {
+    /// <summary>
+    /// The sequence token for the EventStore Stream.
+    /// </summary>
+    /// <remarks>This must derive from EventSequenceToken to use the Orleans SimpleQueueAdapterCache.</remarks>
     public class EventStoreStreamSequenceToken : EventSequenceToken
     {
+        /// <summary>
+        /// The EventNumber of the EventStore ResolvedEvent.
+        /// </summary>
+        /// <remarks>This is always the child event number if the Event is a linkTo.</remarks>
         public int EventNumber { get; }
 
         public EventStoreStreamSequenceToken(int eventNumber) : base(eventNumber, eventNumber)
