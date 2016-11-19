@@ -35,8 +35,8 @@ namespace OrleansEventStoreProvider
             m_ProviderName = providerName;
             m_Logger = logger;
 
-            m_QueueMapper = new EventStoreQueueMapper(2, providerName);
-            m_QueueAdapterCache = new SimpleQueueAdapterCache(100, m_Logger);
+            m_QueueMapper = new EventStoreQueueMapper(1, providerName);
+            m_QueueAdapterCache = new SimpleQueueAdapterCache(1000, m_Logger);
 
             m_ConnectionString = config.Properties["ConnectionString"];
         }

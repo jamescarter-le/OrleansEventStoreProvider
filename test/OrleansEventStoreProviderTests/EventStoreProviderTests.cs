@@ -1,10 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Threading.Tasks;
-using Orleans;
+using EventStore.ClientAPI.Embedded;
 using Orleans.Storage;
-using Orleans.Streams;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
 using OrleansEventStoreProvider;
@@ -12,30 +10,10 @@ using Xunit;
 
 namespace OrleansEventStoreProviderTests
 {
-    public interface IStreamSubscriberGrain : IGrainWithGuidKey
-    {
-        Task SubscribeTo(Guid streamGuid, string streamNamespace, string providerName);
-        Task<bool> HasReceivedMessage();
-    }
-
-    public class StreamSubscriberGrain : Grain, IStreamSubscriberGrain
-    {
-        private bool m_ReceivedMessage;
-
-        public async Task SubscribeTo(Guid streamGuid, string streamNamespace, string providerName)
-        {
-            var provider = this.GetStreamProvider(providerName);
-            var stream = provider.GetStream<int>(streamGuid, streamNamespace);
-            await stream.SubscribeAsync(async (i, s) => m_ReceivedMessage = true);
-        }
-
-        public Task<bool> HasReceivedMessage() => Task.FromResult(m_ReceivedMessage);
-    }
-
     public class EventStoreProviderTests : TestingSiloHost
     {
         private const string ProviderName = "EventStoreStreamProvider";
-        // Default settings of EventStore
+        // Default Endpoints of EventStore
         private const string ConnectionString = "ConnectTo=tcp://admin:changeit@localhost:1113";
 
         private static readonly TestingSiloOptions m_SiloOptions;
@@ -74,6 +52,15 @@ namespace OrleansEventStoreProviderTests
 
         public EventStoreProviderTests() : base(m_SiloOptions, m_ClientOptions)
         {
+            StartEmbeddedEventStore();
+        }
+
+        private void StartEmbeddedEventStore()
+        {
+            var nodeBuilder = EmbeddedVNodeBuilder.AsSingleNode().OnDefaultEndpoints().RunInMemory();
+            nodeBuilder.WithStatsPeriod(TimeSpan.FromSeconds(1));
+            var node = nodeBuilder.Build();
+            node.StartAndWaitUntilReady().Wait();
         }
 
         [Fact]
@@ -84,9 +71,21 @@ namespace OrleansEventStoreProviderTests
         [Fact]
         public async Task CanSubscribe()
         {
-            var subscriber = GrainFactory.GetGrain<IStreamSubscriberGrain>(Guid.Empty);
+            var subscriber = GrainFactory.GetGrain<IStreamSubscriberGrain<object>>(Guid.Empty);
             await subscriber.SubscribeTo(Guid.Empty, "$stats-127.0.0.1:2113", ProviderName);
-            await TestingUtils.WaitUntilAsync((x) => subscriber.HasReceivedMessage(), TimeSpan.FromSeconds(30));
+            await TestingUtils.WaitUntilAsync(lastTry => subscriber.HasReceivedMessage(), TimeSpan.FromSeconds(5));
+        }
+
+        [Fact]
+        public async Task CanDeserializeJsonMessage()
+        {
+            var subscriber = GrainFactory.GetGrain<IStreamSubscriberGrain<Dictionary<string, string>>>(Guid.Empty);
+            await subscriber.SubscribeTo(Guid.Empty, "$stats-127.0.0.1:2113", ProviderName);
+            await TestingUtils.WaitUntilAsync(lastTry => subscriber.HasReceivedMessage(), TimeSpan.FromSeconds(5));
+
+            var msg = await subscriber.ReceivedMessage();
+            Assert.IsAssignableFrom<Dictionary<string, string>>(msg);
+            Assert.True(msg.ContainsKey("proc-id"));
         }
     }
 }
