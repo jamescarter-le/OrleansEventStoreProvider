@@ -16,6 +16,7 @@ This is a proof of concept repository, and not yet in use in Production.
 ## Implemented Features
 - Can subscribe to an EventStore stream using Orleans StreamNamespace as the EventStore Stream identifier.
 - Can subscribe to an EventStore stream, meaning you will receive new events after Subscription.
+- Can push messages to an EventStream using the StreamNamespace as the EventStore Stream identifier.
 
 #### Serialization
 Default `ResolvedEvent Data` serialization is Json, as indicated by the value of the IsJson flag on the EventStore `ResolvedMessage`.
@@ -25,13 +26,9 @@ If the `ResolvedEvent.IsJson` flag is false, `Meta` is deserialized by Json, and
 - Json
 - MsgPack
 
-
-## Not Implemented Features
+## Not Yet Implemented Features
 - The use of an Orleans StreamGuid has no effect.
-- Pushing of events to EventStore through a Subscription (OnNext).
-- Reading of streams - meaning you are not currently able to read from the Start or any Position in a Stream.
-
-
+- Subscribing at a point to a Stream - meaning you are not currently able to read from the Start or any Position in a Stream.
 
 ## Configuration
 
