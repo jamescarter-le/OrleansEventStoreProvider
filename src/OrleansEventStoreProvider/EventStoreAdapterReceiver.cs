@@ -12,17 +12,17 @@ namespace Orleans.Providers.Streams.EventStore
     public class EventStoreAdapterReceiver : IQueueAdapterReceiver
     {
         private readonly QueueId m_QueueId;
-        private IEventStoreConnection m_EventStoreConnection;
+        private readonly IEventStoreConnection m_EventStoreConnection;
         private readonly Logger m_Logger;
 
         private readonly ConcurrentDictionary<string, object> m_CachedSubscriptions = new ConcurrentDictionary<string, object>();
-        private readonly ConcurrentQueue<EventStoreBatchContainer> m_MessagesAwaitingDelivery = new ConcurrentQueue<EventStoreBatchContainer>();
+        private readonly ConcurrentQueue<IBatchContainer> m_MessagesAwaitingDelivery = new ConcurrentQueue<IBatchContainer>();
 
-        public EventStoreAdapterReceiver(QueueId queueId, Logger logger, string connectionString)
+        public EventStoreAdapterReceiver(QueueId queueId, Logger logger, IEventStoreConnection connection)
         {
             m_QueueId = queueId;
             m_Logger = logger;
-            ConstructEventStoreConnection(connectionString);
+            m_EventStoreConnection = connection;
         }
 
         /// <summary>
@@ -32,16 +32,16 @@ namespace Orleans.Providers.Streams.EventStore
         /// <returns></returns>
         public async Task Initialize(TimeSpan timeout)
         {
-            await m_EventStoreConnection.ConnectAsync();
         }
 
         /// <summary>
         /// Notify the AdapterRecevier that it should subscribe to an EventStore Stream.
         /// </summary>
         /// <param name="streamNamespace"></param>
-        public void SubscribeTo(string streamNamespace)
+        /// <param name="eventStoreStreamSequenceToken"></param>
+        public void SubscribeTo(string streamNamespace, EventStoreStreamSequenceToken eventStoreStreamSequenceToken)
         {
-            m_CachedSubscriptions.AddOrUpdate(streamNamespace, CreateEventStoreSubscription, 
+            m_CachedSubscriptions.AddOrUpdate(streamNamespace, name => CreateEventStoreSubscription(name, eventStoreStreamSequenceToken), 
                 (streamName, stream) => stream); // Update is a NO-OP.
         }
 
@@ -49,10 +49,28 @@ namespace Orleans.Providers.Streams.EventStore
         /// Creates the Subscription with EventStore.
         /// </summary>
         /// <param name="streamName">The name of the EventStore Stream we are subscribing to.</param>
+        /// <param name="eventStoreStreamSequenceToken"></param>
         /// <returns>An EventStoreSubscription or EventStorePersistentSubscription.</returns>
-        private object CreateEventStoreSubscription(string streamName)
+        private object CreateEventStoreSubscription(string streamName, EventStoreStreamSequenceToken eventStoreStreamSequenceToken)
         {
-            var subscription = m_EventStoreConnection.SubscribeToStreamAsync(streamName, true, EventAppeared, SubscriptionDropped).Result;
+            object subscription = null;
+            if (eventStoreStreamSequenceToken == null || eventStoreStreamSequenceToken.EventNumber == int.MinValue)
+            {
+                var subscribeTask = m_EventStoreConnection.SubscribeToStreamAsync(streamName, true, EventAppeared,
+                    SubscriptionDropped);
+                Task.WaitAll(subscribeTask);
+                if (subscribeTask.IsFaulted)
+                    throw subscribeTask.Exception;
+
+                subscription = subscribeTask.Result;
+            }
+            else
+            {
+                // If we have been provided with a StreamSequenceToken, we can call SubscribeFrom to get previous messages.
+                subscription = m_EventStoreConnection.SubscribeToStreamFrom(streamName,
+                    eventStoreStreamSequenceToken.EventNumber, new CatchUpSubscriptionSettings(100, 20, false, true), EventAppeared);
+            }
+
             m_Logger.Info($"Subscribed to Stream {streamName}");
             return subscription;
         }
@@ -65,12 +83,28 @@ namespace Orleans.Providers.Streams.EventStore
         /// <summary>
         /// Add a ResolvedEvent to the Push Subscription type queue.
         /// </summary>
-        /// <param name="eventStoreSubscription">The subscription for which the event is for.</param>
+        /// <param name="subscription">The subscription for which the event is for.</param>
         /// <param name="resolvedEvent">The event we are being notified with by EventStore.</param>
-        private void EventAppeared(EventStoreSubscription eventStoreSubscription, ResolvedEvent resolvedEvent)
+        private void EventAppeared(EventStoreSubscription subscription, ResolvedEvent resolvedEvent)
+        {
+            EnqueueEvent(subscription.StreamId, resolvedEvent);
+        }
+
+        /// <summary>
+        /// Add a ResolvedEvent to the Push Subscription type queue.
+        /// </summary>
+        /// <param name="subscription">The subscription for which the event is for.</param>
+        /// <param name="resolvedEvent">The event we are being notified with by EventStore.</param>
+        private void EventAppeared(EventStoreCatchUpSubscription subscription, ResolvedEvent resolvedEvent)
+        {
+            m_Logger.Info("EventNumber:" + resolvedEvent.Event.EventNumber);
+            EnqueueEvent(subscription.StreamId, resolvedEvent);
+        }
+
+        private void EnqueueEvent(string streamId, ResolvedEvent resolvedEvent)
         {
             var sequenceToken = new EventStoreStreamSequenceToken(resolvedEvent.Event.EventNumber);
-            m_MessagesAwaitingDelivery.Enqueue(new EventStoreBatchContainer(Guid.Empty, eventStoreSubscription.StreamId, sequenceToken, resolvedEvent));
+            m_MessagesAwaitingDelivery.Enqueue(new EventStoreBatchContainer(Guid.Empty, streamId, sequenceToken, resolvedEvent));
         }
 
         /// <summary>
@@ -84,7 +118,7 @@ namespace Orleans.Providers.Streams.EventStore
             if (maxCount == 0)
                 return containerList;
 
-            EventStoreBatchContainer container;
+            IBatchContainer container;
             while (containerList.Count < maxCount && m_MessagesAwaitingDelivery.TryDequeue(out container))
             {
                 containerList.Add(container);
@@ -129,53 +163,16 @@ namespace Orleans.Providers.Streams.EventStore
             foreach (var stream in m_CachedSubscriptions.Values)
             {
                 (stream as EventStorePersistentSubscription)?.Stop(timeout);
-                (stream as EventStoreSubscription)?.Unsubscribe();
+                (stream as EventStoreStreamCatchUpSubscription)?.Stop(timeout);
             }
 
             return TaskDone.Done;
         }
 
-        private void ConstructEventStoreConnection(string connectionString)
+        // Push a Control Message through to the QueueCache for this Receiver to kick the PullingAgent to grab a QueueCursor.
+        public void Start(Guid id, string streamNamespace)
         {
-            m_EventStoreConnection = EventStoreConnection.Create(connectionString);
-            m_EventStoreConnection.Connected += EventStoreConnection_Connected;
-            m_EventStoreConnection.Disconnected += EventStoreConnection_Disconnected;
-            m_EventStoreConnection.AuthenticationFailed += EventStoreConnection_AuthenticationFailed;
-            m_EventStoreConnection.Closed += EventStoreConnection_Closed;
-            m_EventStoreConnection.ErrorOccurred += EventStoreConnection_ErrorOccurred;
-            m_EventStoreConnection.Reconnecting += EventStoreConnection_Reconnecting;
+            m_MessagesAwaitingDelivery.Enqueue(new BatchContainerControlMessage(id, streamNamespace, new EventStoreStreamSequenceToken(int.MinValue)));
         }
-
-        #region EventStoreEvents
-        private void EventStoreConnection_Reconnecting(object sender, ClientReconnectingEventArgs e)
-        {
-            m_Logger.Info($"Receiver {m_QueueId} is reconnecting.");
-        }
-
-        private void EventStoreConnection_ErrorOccurred(object sender, ClientErrorEventArgs e)
-        {
-            m_Logger.Error(1, $"Receiver {m_QueueId} received an error: {e.Exception}", e.Exception);
-        }
-
-        private void EventStoreConnection_Closed(object sender, ClientClosedEventArgs e)
-        {
-            m_Logger.Info($"Receiver {m_QueueId} closed connection: {e.Reason}");
-        }
-
-        private void EventStoreConnection_AuthenticationFailed(object sender, ClientAuthenticationFailedEventArgs e)
-        {
-            m_Logger.Info($"Receiver {m_QueueId} failed authentication: {e.Reason}");
-        }
-
-        private void EventStoreConnection_Disconnected(object sender, ClientConnectionEventArgs e)
-        {
-            m_Logger.Info($"Receiver {m_QueueId} disconnected from {e.RemoteEndPoint}");
-        }
-
-        private void EventStoreConnection_Connected(object sender, ClientConnectionEventArgs e)
-        {
-            m_Logger.Info($"Receiver {m_QueueId} connected to {e.RemoteEndPoint}");
-        }
-        #endregion
     }
 }

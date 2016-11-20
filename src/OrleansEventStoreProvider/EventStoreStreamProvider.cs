@@ -35,8 +35,8 @@ namespace Orleans.Providers.Streams.EventStore
         IAsyncStream<T> IStreamProvider.GetStream<T>(Guid id, string streamNamespace)
         {
             var queueId = AdapterFactory.GetStreamQueueMapper().GetQueueForStream(id, streamNamespace);
-            var receiver = (EventStoreAdapterReceiver)AdapterFactory.CreateReceiver(queueId);
-            receiver.SubscribeTo(streamNamespace);
+            var queueCache = (EventStoreAdapterReceiver) AdapterFactory.CreateReceiver(queueId);
+            queueCache.Start(id, streamNamespace);
 
             var stream = base.GetStream<T>(id, streamNamespace);
             return stream;

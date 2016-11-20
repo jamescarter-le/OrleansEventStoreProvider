@@ -34,6 +34,9 @@
       <HintPath>..\..\packages\EventStore.Client.3.9.2\lib\net40\EventStore.ClientAPI.dll</HintPath>
       <Private>True</Private>
     </Reference>
+    <Reference Include="EventStore.ClientAPI.Embedded">
+      <HintPath>..\..\packages\EventStore.Client.Embedded.3.9.2\lib\net40\EventStore.ClientAPI.Embedded.dll</HintPath>
+    </Reference>
     <Reference Include="MsgPack, Version=0.8.0.0, Culture=neutral, PublicKeyToken=a2625990d5dc0167, processorArchitecture=MSIL">
       <HintPath>..\..\packages\MsgPack.Cli.0.8.0\lib\net46\MsgPack.dll</HintPath>
       <Private>True</Private>
@@ -71,6 +74,7 @@
     <Compile Include="EventStoreAdapterFactory.cs" />
     <Compile Include="EventStoreAdapterReceiver.cs" />
     <Compile Include="EventStoreBatchContainer.cs" />
+    <Compile Include="EventStoreQueueAdapterCache.cs" />
     <Compile Include="EventStoreQueueMapper.cs" />
     <Compile Include="EventStoreStreamProvider.cs" />
     <Compile Include="EventStoreStreamSequenceToken.cs" />
@@ -78,7 +82,12 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="app.config" />
-    <None Include="packages.config" />
+    <None Include="OrleansEventStoreProvider.nuspec">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="packages.config">
+      <SubType>Designer</SubType>
+    </None>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

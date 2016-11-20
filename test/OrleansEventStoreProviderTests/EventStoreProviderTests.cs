@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using EventStore.ClientAPI.Embedded;
 using EventStore.Core;
+using Orleans;
 using Orleans.Providers.Streams.EventStore;
 using Orleans.Storage;
 using Orleans.TestingHost;
@@ -17,9 +18,11 @@ namespace OrleansEventStoreProviderTests
         // Default Endpoints of EventStore
         private const string ConnectionString = "ConnectTo=tcp://admin:changeit@localhost:1113";
 
+        private static ClusterVNode EventStoreNode;
+        private const bool EnableEmbeddedEventStore = false;
+
         private static readonly TestingSiloOptions m_SiloOptions;
         private static readonly TestingClientOptions m_ClientOptions;
-        private ClusterVNode m_EventStoreNode;
 
         static EventStoreProviderTests()
         {
@@ -50,19 +53,23 @@ namespace OrleansEventStoreProviderTests
                         });
                 }
             };
+
+            StartEmbeddedEventStore();
         }
 
         public EventStoreProviderTests() : base(m_SiloOptions, m_ClientOptions)
         {
-            StartEmbeddedEventStore();
         }
 
-        private void StartEmbeddedEventStore()
+        private static void StartEmbeddedEventStore()
         {
-            var nodeBuilder = EmbeddedVNodeBuilder.AsSingleNode().OnDefaultEndpoints().RunInMemory();
-            nodeBuilder.WithStatsPeriod(TimeSpan.FromSeconds(1));
-            m_EventStoreNode = nodeBuilder.Build();
-            m_EventStoreNode.StartAndWaitUntilReady().Wait();
+            if (EnableEmbeddedEventStore)
+            {
+                var nodeBuilder = EmbeddedVNodeBuilder.AsSingleNode().OnDefaultEndpoints().RunInMemory();
+                nodeBuilder.WithStatsPeriod(TimeSpan.FromSeconds(1));
+                EventStoreNode = nodeBuilder.Build();
+                EventStoreNode.StartAndWaitUntilReady().Wait();
+            }
         }
 
         [Fact]
@@ -70,7 +77,9 @@ namespace OrleansEventStoreProviderTests
         {
             var subscriber = GrainFactory.GetGrain<IStreamSubscriberGrain<object>>(Guid.Empty);
             await subscriber.SubscribeTo(Guid.Empty, "$stats-127.0.0.1:2113", ProviderName);
-            await TestingUtils.WaitUntilAsync(lastTry => subscriber.HasReceivedMessage(), TimeSpan.FromSeconds(5));
+            await TestingUtils.WaitUntilAsync(lastTry => subscriber.HasReceivedMessage(), TimeSpan.FromSeconds(30));
+
+            Assert.True(await subscriber.HasReceivedMessage());
         }
 
         [Fact]
@@ -78,16 +87,39 @@ namespace OrleansEventStoreProviderTests
         {
             var subscriber = GrainFactory.GetGrain<IStreamSubscriberGrain<Dictionary<string, string>>>(Guid.Empty);
             await subscriber.SubscribeTo(Guid.Empty, "$stats-127.0.0.1:2113", ProviderName);
-            await TestingUtils.WaitUntilAsync(lastTry => subscriber.HasReceivedMessage(), TimeSpan.FromSeconds(5));
+            await TestingUtils.WaitUntilAsync(lastTry => subscriber.HasReceivedMessage(), TimeSpan.FromSeconds(30));
 
             var msg = await subscriber.ReceivedMessage();
             Assert.IsAssignableFrom<Dictionary<string, string>>(msg);
             Assert.True(msg.ContainsKey("proc-id"));
         }
 
+        [Fact]
+        public async Task CanReadFromStartOfStream()
+        {
+            var testStream = $"TestStream-{Guid.NewGuid()}";
+
+            var provider = GrainClient.GetStreamProvider(ProviderName);
+            var stream = provider.GetStream<int>(Guid.Empty, testStream);
+            await stream.OnNextAsync(1);
+            await stream.OnNextAsync(2);
+            await stream.OnNextAsync(3);
+            await stream.OnNextAsync(4);
+            await stream.OnNextAsync(5);
+
+            var subscriber = GrainFactory.GetGrain<IStreamSubscriberGrain<int>>(Guid.Empty);
+            await subscriber.SubscribeFrom(Guid.Empty, testStream, ProviderName, -1);
+            await TestingUtils.WaitUntilAsync(async lastTry => await subscriber.ReceivedCount() == 5, TimeSpan.FromSeconds(30));
+
+            Assert.Equal(5, await subscriber.ReceivedCount());
+        }
+
         public void Dispose()
         {
-            m_EventStoreNode.StopNonblocking(false, true);
+            if (EnableEmbeddedEventStore)
+            {
+                EventStoreNode.StopNonblocking(false, true);
+            }
         }
     }
 }

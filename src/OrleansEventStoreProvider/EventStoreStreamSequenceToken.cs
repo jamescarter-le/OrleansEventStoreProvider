@@ -1,4 +1,5 @@
-﻿using Orleans.Providers.Streams.Common;
+﻿using System;
+using Orleans.Providers.Streams.Common;
 using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.EventStore
@@ -7,6 +8,7 @@ namespace Orleans.Providers.Streams.EventStore
     /// The sequence token for the EventStore Stream.
     /// </summary>
     /// <remarks>This must derive from EventSequenceToken to use the Orleans SimpleQueueAdapterCache.</remarks>
+    [Serializable]
     public class EventStoreStreamSequenceToken : EventSequenceToken
     {
         /// <summary>

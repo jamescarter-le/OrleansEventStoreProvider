@@ -9,6 +9,35 @@ using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.EventStore
 {
+    public class BatchContainerControlMessage : IBatchContainer
+    {
+        public BatchContainerControlMessage(Guid streamGuid, string streamNamespace, StreamSequenceToken sequenceToken)
+        {
+            StreamGuid = streamGuid;
+            StreamNamespace = streamNamespace;
+            SequenceToken = sequenceToken;
+        }
+
+        public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>()
+        {
+            yield break;
+        }
+
+        public bool ImportRequestContext()
+        {
+            return false;
+        }
+
+        public bool ShouldDeliver(IStreamIdentity stream, object filterData, StreamFilterPredicate shouldReceiveFunc)
+        {
+            return false;
+        }
+
+        public Guid StreamGuid { get; }
+        public string StreamNamespace { get; }
+        public StreamSequenceToken SequenceToken { get; }
+    }
+
     public class EventStoreBatchContainer : IBatchContainer
     {
         public Guid StreamGuid { get; }
